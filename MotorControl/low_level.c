@@ -33,15 +33,19 @@ float vbus_voltage = 12.0f; //Arbitrary non-zero inital value to avoid division 
 #define ENCODER_CPR (600*4)
 static const float elec_rad_per_enc = 7.0 * 2 * M_PI * (1.0f / (float)ENCODER_CPR);
 
+// break MotorControl/low_level.c:762
+// p motor->pos_setpoint
+// 
+
 //@TODO: Migrate to C++, clearly we are actually doing object oriented code here...
 Motor_t motors[] = {
     {   //M0
         .control_mode = CURRENT_CONTROL,
         .pos_setpoint = 0.0f,
-        .pos_gain = 20.0f, // [(counts/s) / counts]
+        .pos_gain = 120.0f, // [(counts/s) / counts]
         .vel_setpoint = 0.0f,
-        .vel_gain = 5.0f / 10000.0f, // [A/(counts/s)]
-        .vel_limit = 10000.0f, // [counts/s]
+        .vel_gain = 40.0f / 10000.0f, // [A/(counts/s)]
+        .vel_limit = 60000.0f, // [counts/s]
         .current_setpoint = 0.0f, // [A]
         .motor_thread = 0,
         .thread_ready = false,
@@ -62,7 +66,7 @@ Motor_t motors[] = {
         },
         .shunt_conductance = 1.0f/0.0005f, //[S]
         .current_control = {
-            .current_lim = 75.0f, //[A] //Note: consistent with 40v/v gain
+            .current_lim = 50.0f, //[A] //Note: consistent with 40v/v gain
             .p_gain = 0.0f, // [V/A] should be auto set after resistance and inductance measurement
             .i_gain = 0.0f, // [V/As] should be auto set after resistance and inductance measurement
             .v_current_control_integral_d = 0.0f,
@@ -106,7 +110,7 @@ Motor_t motors[] = {
         },
         .shunt_conductance = 1.0f/0.0005f, //[S]
         .current_control = {
-            .current_lim = 75.0f, //[A] //Note: consistent with 40v/v gain
+            .current_lim = 5.0f, //[A] //Note: consistent with 40v/v gain
             .p_gain = 0.0f, // [V/A] should be auto set after resistance and inductance measurement
             .i_gain = 0.0f, // [V/As] should be auto set after resistance and inductance measurement
             .v_current_control_integral_d = 0.0f,
@@ -731,6 +735,7 @@ static void FOC_current(Motor_t* motor, float Id_des, float Iq_des) {
 }
 
 static void control_motor_loop(Motor_t* motor) {
+    int i = 0;
     for (;;) {
         osSignalWait(M_SIGNAL_PH_CURRENT_MEAS, osWaitForever);
         update_rotor(&motor->rotor);
@@ -756,6 +761,11 @@ static void control_motor_loop(Motor_t* motor) {
         if (Iq >  Ilim) Iq =  Ilim;
         if (Iq < -Ilim) Iq = -Ilim;
         FOC_current(motor, 0.0f, Iq);
+
+        if (i >= CURRENT_MEAS_HZ * 10) {
+          //safe_assert(0);
+        }
+        i++;
     }
 }
 
@@ -796,12 +806,12 @@ void motor_thread(void const * argument) {
     // scan_motor(motor, 50.0f, test_current * R);
 
     // // Velocity test
-    // motors[0].vel_setpoint = 10000.0f; // [counts/s]
-    // motors[0].control_mode = VELOCITY_CONTROL;
+    //motors[0].vel_setpoint = 10000.0f; // [counts/s]
+    //motors[0].control_mode = VELOCITY_CONTROL;
 
     // // Position test
-    // motors[0].pos_setpoint = 50000.0f; // [counts/s]
-    // motors[0].control_mode = POSITION_CONTROL;
+    motors[0].pos_setpoint = 50000.0f; // [counts/s]
+    motors[0].control_mode = POSITION_CONTROL;
 
     control_motor_loop(motor);
 
